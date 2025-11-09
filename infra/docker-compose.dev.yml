@@ -1,0 +1,92 @@
+services:
+  db_auth:
+    image: postgres:16
+    container_name: auth_db_dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: auth
+      POSTGRES_USER: auth_user
+    env_file:
+      - ./secrets/db_auth.env
+    volumes:
+      - auth_pgdata_dev:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    ports:
+      - "5436:5432"
+
+  auth_service:
+    build:
+      context: ..
+      dockerfile: services/auth_service/Dockerfile
+    container_name: auth_service_dev
+    depends_on:
+      db_auth:
+        condition: service_healthy
+    environment:
+      PYTHONPATH: /app:/app/shared
+      ENV: development
+      WATCHFILES_FORCE_POLLING: "true"
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      - ../services/auth_service/app:/app/app
+      - ../services/auth_service/migrations:/app/migrations
+      - ../services/auth_service/alembic.ini:/app/alembic.ini
+      - ../shared:/app/shared
+    ports:
+      - "8001:8001"
+      - "5678:5678"
+    command: >
+      sh -c "alembic upgrade head &&
+             python -m debugpy --listen 0.0.0.0:5678 --wait-for-client
+             -m uvicorn app.app:create_app --factory --host 0.0.0.0 --port 8001
+             --reload --reload-exclude 'migrations/*'"
+    restart: unless-stopped
+    env_file:
+      - ./secrets/auth_service.env
+
+  courses_service:
+    build:
+      context: ..
+      dockerfile: services/courses_service/Dockerfile
+    depends_on:
+      db_courses:
+        condition: service_healthy
+    env_file:
+      - ./secrets/courses_service.env
+    environment:
+      WATCHFILES_FORCE_POLLING: "true"
+      PYTHONPATH: /app:/app/shared
+    volumes:
+      - ../services/courses_service/app:/app/app
+      - ../services/courses_service/migrations:/app/migrations
+      - ../services/courses_service/alembic.ini:/app/alembic.ini
+      - ../shared:/app/shared
+    ports:
+      - "8003:8003"
+    command: >
+      sh -c "alembic upgrade head || true;
+             uvicorn app.app:create_app --factory --host 0.0.0.0 --port 8003 --reload"
+
+  db_courses:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: courses
+      POSTGRES_USER: courses_user
+      POSTGRES_PASSWORD: ${COURSES_DB_PASSWORD:?set in secrets}
+    env_file:
+      - ./secrets/courses_service.env
+    volumes:
+      - courses_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB" ]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+volumes:
+  auth_pgdata_dev:
+  courses_pgdata:
