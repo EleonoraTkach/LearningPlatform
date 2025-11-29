@@ -1,17 +1,14 @@
 import os
 
-from app.api.main_router import main_router
-from app.core.config import settings
-from app.core.startup import register_startup
-from app.middleware.auth import setup_auth
 from fastapi import FastAPI
-from starlette.middleware.cors import CORSMiddleware
+
+from app.api.main_router import main_router
 
 
-def try_pycharm_attach():
+def try_pycharm_attach() -> None:
   if os.getenv("PYCHARM_ATTACH", "0").lower() in ("1", "true", "yes"):
     try:
-      import pydevd_pycharm  # type: ignore[import-not-found] # noqa: PLC0415
+      import pydevd_pycharm  # noqa: PLC0415
 
       host = os.getenv("PYCHARM_HOST", "host.docker.internal")
       port = int(os.getenv("PYCHARM_PORT", "5678"))
@@ -28,28 +25,19 @@ def try_pycharm_attach():
 
 def create_app() -> FastAPI:
   try_pycharm_attach()
+
   app = FastAPI(
     title="Auth Service",
     version="1.0.0",
-    docs_url="/auth_service/docs",
-    redoc_url="/auth_service/redoc",
-    openapi_url="/auth_service/openapi.json",
-  )
-  setup_auth(app)
-
-  origins = settings.cors_origins
-
-  app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json",
   )
 
-  async def _startup_attach():
+  async def _startup_attach() -> None:
     try_pycharm_attach()
 
+  # app.add_event_handler("startup", _startup_attach)
+
   app.include_router(main_router)
-  register_startup(app)
   return app

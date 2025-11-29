@@ -2,10 +2,11 @@ import enum
 import uuid
 from datetime import datetime
 
-from app.common.db.base import Base
 from sqlalchemy import DateTime, ForeignKey, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column
+
+from app.common.db.base import Base
 
 
 class TokenPurpose(str, enum.Enum):

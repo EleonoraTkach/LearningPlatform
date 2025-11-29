@@ -3,9 +3,6 @@ services:
     image: postgres:16
     container_name: auth_db_dev
     restart: unless-stopped
-    environment:
-      POSTGRES_DB: auth
-      POSTGRES_USER: auth_user
     env_file:
       - ./secrets/db_auth.env
     volumes:
@@ -26,12 +23,8 @@ services:
     depends_on:
       db_auth:
         condition: service_healthy
-    environment:
-      PYTHONPATH: /app:/app/shared
-      ENV: development
-      WATCHFILES_FORCE_POLLING: "true"
-      PYTHONDONTWRITEBYTECODE: "1"
-      PYTHONUNBUFFERED: "1"
+    env_file:
+      - ./secrets/auth_service.env
     volumes:
       - ../services/auth_service/app:/app/app
       - ../services/auth_service/migrations:/app/migrations
@@ -41,22 +34,15 @@ services:
       - "8001:8001"
       - "5678:5678"
     command: >
-      sh -c "alembic upgrade head &&
-             python -m debugpy --listen 0.0.0.0:5678 --wait-for-client
-             -m uvicorn app.app:create_app --factory --host 0.0.0.0 --port 8001
-             --reload --reload-exclude 'migrations/*'"
+      sh -c "alembic upgrade head || true;
+             uvicorn app.app:create_app --factory --host 0.0.0.0 --port 8001 --reload --reload-exclude 'migrations/*'"
     restart: unless-stopped
-    env_file:
-      - ./secrets/auth_service.env
 
   db_courses:
     image: postgres:16
-    environment:
-      POSTGRES_DB: courses
-      POSTGRES_USER: courses_user
-      POSTGRES_PASSWORD: ${COURSES_DB_PASSWORD:?set in secrets}
+    container_name: courses_db_dev
     env_file:
-      - ./secrets/courses_service.env
+      - ./secrets/db_courses.env
     volumes:
       - courses_pgdata_dev:/var/lib/postgresql/data
     healthcheck:
@@ -68,34 +54,29 @@ services:
   courses_service:
     build:
       context: ..
-    dockerfile: services/courses_service/Dockerfile
+      dockerfile: services/courses_service/Dockerfile
+    container_name: courses_service_dev
     depends_on:
       db_courses:
         condition: service_healthy
     env_file:
       - ./secrets/courses_service.env
-    environment:
-      WATCHFILES_FORCE_POLLING: "true"
-      PYTHONPATH: /app:/app/shared
     volumes:
       - ../services/courses_service/app:/app/app
       - ../services/courses_service/migrations:/app/migrations
       - ../services/courses_service/alembic.ini:/app/alembic.ini
       - ../shared:/app/shared
     ports:
-      - "8003:8003"
+      - "8002:8002"
     command: >
       sh -c "alembic upgrade head || true;
-             uvicorn app.app:create_app --factory --host 0.0.0.0 --port 8003 --reload"
+             uvicorn app.app:create_app --factory --host 0.0.0.0 --port 8002 --reload"
 
   db_progress:
     image: postgres:16
-    environment:
-      POSTGRES_DB: progress
-      POSTGRES_USER: progress_user
-      POSTGRES_PASSWORD: ${PROGRESS_DB_PASSWORD:?set in secrets}
+    container_name: progress_db_dev
     env_file:
-      - ./secrets/progress_service.env
+      - ./secrets/db_progress.env
     volumes:
       - progress_pgdata_dev:/var/lib/postgresql/data
     healthcheck:
@@ -108,24 +89,22 @@ services:
     build:
       context: ..
       dockerfile: services/progress_service/Dockerfile
+    container_name: progress_service_dev
     depends_on:
       db_progress:
         condition: service_healthy
     env_file:
       - ./secrets/progress_service.env
-    environment:
-      WATCHFILES_FORCE_POLLING: "true"
-      PYTHONPATH: /app:/app/shared
     volumes:
       - ../services/progress_service/app:/app/app
       - ../services/progress_service/migrations:/app/migrations
       - ../services/progress_service/alembic.ini:/app/alembic.ini
       - ../shared:/app/shared
     ports:
-      - "8005:8005"
+      - "8003:8003"
     command: >
       sh -c "alembic upgrade head || true;
-             uvicorn app.app:create_app --factory --host 0.0.0.0 --port 8005 --reload"
+             uvicorn app.app:create_app --factory --host 0.0.0.0 --port 8003 --reload"
 
 volumes:
   auth_pgdata_dev:
