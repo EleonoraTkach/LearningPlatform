@@ -73,7 +73,7 @@ class UserResponse(BaseModel):
     display_name: Optional[str] = None
     login: Optional[str] = None
     role: UserRole
-    is_deleted: bool = False
+    deleted_flg: bool = False
     created_at: datetime
     updated_at: Optional[datetime] = None
 
